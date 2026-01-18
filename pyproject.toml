@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "otus_post_json_valitor"
+version = "0.1.0"
+description = ""
+authors = ["akhmadiev <akhmadiev@tax-monitor.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+mypy = "^1.19.1"
+pytest = "^9.0.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+exclude = ["scripts", "docs", "test"]
+disable_error_code = ["name-defined"]
+explicit_package_bases = true
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.8.0"
