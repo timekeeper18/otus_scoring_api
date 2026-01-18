@@ -1,0 +1,49 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"] # Укажите нужные версии Python
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies with Poetry
+        uses: snok/install-poetry@v1
+
+
+      - name: Load cached Poetry dependencies
+        id: cached-poetry-deps
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install project dependencies
+        if: steps.cached-poetry-deps.outputs.cache-hit != 'true'
+        run: poetry install --with dev
+
+      - name: Run black (code formatting)
+        run: poetry run black --check src/ tests/
+
+      - name: Run isort (import sorting)
+        run: poetry run isort --check-only src/ tests/
+
+      - name: Run flake8 (linting)
+        run: poetry run flake8 src/ tests/
+
+      - name: Run mypy (type checking)
+        run: poetry run mypy src/
+
+      - name: Run tests with pytest
+        run: poetry run pytest tests/ -v
