@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.12"
 mypy = "^1.19.1"
 pytest = "^9.0.2"
+pre-commit = "^4.5.1"
 
 
 [build-system]
@@ -26,6 +27,8 @@ explicit_package_bases = true
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.8.0"
+pre-commit = "^4.0.1"
+yapf = "^0.40.2"
 
 [tool.yapf]
 based_on_style = "pep8"
@@ -35,7 +38,3 @@ align_closing_bracket_with_visual_indent = true
 dedent_closing_brackets = false
 split_before_named_assigns = true
 split_arguments_when_comma_terminated = true
-
-[tool.poetry.group.dev.dependencies]
-pre-commit = "^4.0.1"
-yapf = "^0.40.2"
