@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "otus_post_json_valitor"
+name = "otus_scoring_api"
 version = "0.1.0"
 description = ""
 authors = ["akhmadiev <akhmadiev@tax-monitor.ru>"]
@@ -35,3 +35,7 @@ align_closing_bracket_with_visual_indent = true
 dedent_closing_brackets = false
 split_before_named_assigns = true
 split_arguments_when_comma_terminated = true
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.0.1"
+yapf = "^0.40.2"
