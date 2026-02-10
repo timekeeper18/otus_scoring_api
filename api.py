@@ -13,6 +13,7 @@ from http.server import (
 from typing import Any, Callable, Optional
 
 import src.scoring as scoring
+from src.store import get_store
 
 
 class Gender(Enum):
@@ -503,11 +504,19 @@ def online_score_handler(request: OnlineScoreRequest, ctx: dict, store, is_admin
     if not pairs:
         raise ValidationError("No valid field pairs found")
 
-    # Используем функцию из scoring.py
+    # Преобразуем строковую дату в datetime для scoring.get_score
+    birthday_dt = None
+    if request.birthday:
+        try:
+            birthday_dt = datetime.datetime.strptime(request.birthday, '%d.%m.%Y')
+        except ValueError:
+            pass
+
     score = scoring.get_score(
-        phone=request.phone,
+        store=store,
+        phone=str(request.phone) if request.phone else None,
         email=request.email,
-        birthday=request.birthday,
+        birthday=birthday_dt,
         gender=request.gender,
         first_name=request.first_name,
         last_name=request.last_name
@@ -550,8 +559,8 @@ def clients_interests_handler(request: ClientsInterestsRequest, ctx: dict, store
     """
     result = {}
     for client_id in request.client_ids:
-        # Используем функцию из scoring.py
-        interests = scoring.get_interests(str(client_id))
+        # Используем функцию из scoring.py с store
+        interests = scoring.get_interests(store=store, cid=str(client_id))
         result[str(client_id)] = interests
 
     ctx['nclients'] = len(request.client_ids)
@@ -585,7 +594,7 @@ def method_handler(
         # Извлекаем данные из запроса
         body = request.get("body", {})
 
-        # Логируем полученный запрос
+        # Генерация request_id
         request_id = ctx.get("request_id", "unknown")
         if request_id == "unknown":
             request_id = uuid.uuid4().hex
@@ -620,6 +629,7 @@ def method_handler(
                 logging.warning(f"Request ID: {request_id}, Invalid score request: {score_request.errors}")
                 error_msg = "; ".join([f"{k}: {v}" for k, v in score_request.errors.items()])
                 return {"error": error_msg}, INVALID_REQUEST
+
             return online_score_handler(score_request, ctx, store, method_request.is_admin)
 
         elif method_request.method == "clients_interests":
@@ -630,6 +640,7 @@ def method_handler(
                 logging.warning(f"Request ID: {request_id}, Invalid interests request: {interests_request.errors}")
                 error_msg = "; ".join([f"{k}: {v}" for k, v in interests_request.errors.items()])
                 return {"error": error_msg}, INVALID_REQUEST
+
             return clients_interests_handler(interests_request, ctx, store)
 
         else:
@@ -641,8 +652,8 @@ def method_handler(
         logging.warning(f"Request ID: {request_id}, Validation error: {str(e)}")
         return {"error": str(e)}, INVALID_REQUEST
     except Exception as e:
-        request_id = ctx.get("request_id", "unknown")
-        logging.exception(f"Request ID: {request_id}, Unexpected error in method_handler: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"error": "Internal server error"}, INTERNAL_ERROR
 
 
@@ -718,7 +729,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
                     response, code = self.router[path](
                         {"body": request, "headers": self.headers},
                         context,
-                        None  # store передается как None, т.к. в scoring.py он не используется
+                        get_store()
                     )
                 except Exception as e:
                     logging.exception(f"Request ID: {context['request_id']}, Unexpected error: {e}")
@@ -766,33 +777,30 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-p", "--port", action="store", type=int, default=8080)
     parser.add_argument("-l", "--log", action="store", default=None)
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-
-    logging.basicConfig(
-        filename=args.log,
-        level=log_level,
-        format="[%(asctime)s] %(levelname).1s %(message)s",
-        datefmt="%Y.%m.%d %H:%M:%S",
-    )
+    log_level = logging.INFO
 
     # Если файл лога не указан, выводим логи в консоль
-    if not args.log:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(log_level)
-        console_handler.setFormatter(logging.Formatter(
-            "[%(asctime)s] %(levelname).1s %(message)s",
-            datefmt="%Y.%m.%d %H:%M:%S"
-        ))
-        logging.getLogger().addHandler(console_handler)
-
+    if args.log:
+        logging.basicConfig(
+            filename=args.log,
+            level=log_level,
+            format="[%(asctime)s] %(levelname).1s %(message)s",
+            datefmt="%Y.%m.%d %H:%M:%S",
+            force=True  # Принудительно перезаписываем конфигурацию
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="[%(asctime)s] %(levelname).1s %(message)s",
+            datefmt="%Y.%m.%d %H:%M:%S",
+            force=True  # Принудительно перезаписываем конфигурацию
+        )
     server = HTTPServer(("localhost", args.port), MainHTTPHandler)
 
     logging.info(f"Starting server at port {args.port}")
     logging.info(f"Log level: {logging.getLevelName(log_level)}")
-
     try:
         server.serve_forever()
     except KeyboardInterrupt:
